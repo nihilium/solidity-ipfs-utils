@@ -1,5 +1,5 @@
 {
-    "name": "solidity-ipfs-utils",
+    "name": "@nihilium/solidity-ipfs-utils",
     "version": "0.1.0",
     "description": "",
     "main": "index.js",
