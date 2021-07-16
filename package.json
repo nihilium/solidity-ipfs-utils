@@ -1,0 +1,33 @@
+{
+    "name": "solidity-ipfs-utils",
+    "version": "0.1.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "mocha -r ts-node/register 'test/**/*.ts' --timeout 60000",
+        "build": "waffle"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nihilium/solidity-ipfs-utils.git"
+    },
+    "author": "Olaf van Wijk",
+    "license": "Apache-2.0",
+    "bugs": {
+        "url": "https://github.com/nihilium/solidity-ipfs-utils/issues"
+    },
+    "homepage": "https://github.com/nihilium/solidity-ipfs-utils#readme",
+    "devDependencies": {
+        "@types/chai": "^4.2.21",
+        "@types/jest": "^26.0.24",
+        "@types/mocha": "^8.2.3",
+        "chai": "^4.3.4",
+        "ethereum-waffle": "^3.4.0",
+        "mocha": "^9.0.2",
+        "ts-node": "^10.1.0",
+        "typescript": "^4.1.3"
+    },
+    "dependencies": {
+        "@lazyledger/protobuf3-solidity-lib": "^0.5.1"
+    }
+}
