@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity >=0.6.0 <8.0.0;
 pragma experimental ABIEncoderV2;
 
@@ -14,6 +15,79 @@ library IpfsFunctions {
         HAMTShard
     }
     
+    
+    /// @notice calculate_ipfs_sha256_32_single_chunk, does a sha256 multihash of a single chunk file
+    /// @param file_content Content bytes of the single chunk file
+  
+    /// @return File hash
+    /// @return File size
+    function calculate_ipfs_sha256_32_single_chunk(bytes memory file_content) public pure returns (bytes32, uint) {
+        require(file_content.length <= 65536, "Max content size is 65536 bytes");
+        bytes memory data_msg = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.Varint));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(DataType.File)));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_bytes(file_content));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_key(3, uint64(ProtobufLib.WireType.Varint)));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(file_content.length)));       
+
+        bytes memory PBNode = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited));
+        PBNode = abi.encodePacked(PBNode,  ProtobufLib.encode_bytes(data_msg));
+        return (sha256(PBNode), PBNode.length);
+    }
+
+    /// @notice pack_hash, wraps the hash inside a multihash based hex by prefixing.
+    /// @param h hash to prefix
+    
+    /// @return Multihash bytes
+    function pack_hash(bytes32 h) public pure returns (bytes memory) {
+        return abi.encodePacked(sha256_32b, h);
+    }
+
+    /// @notice calculate_folder_hash, calculates the folder hash given children hashes.
+    
+    /// @param hashes Hashes of the other files, minus the multihash prefix
+    /// @param names File names of the files
+    /// @param sizes Sizes of the file    
+    /// @return Folder hash
+    function calculate_folder_hash(bytes32[] memory hashes, string[] memory names, uint64[] memory sizes) public pure returns (bytes32) {
+        require(hashes.length  == names.length && hashes.length == sizes.length, "All arrays must be of the same size");
+        
+        bytes memory node_msg;
+            
+        for (uint i=0; i<hashes.length; i++) {            
+            bytes memory embedded;            
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited)));
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_bytes(pack_hash(hashes[i])));
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_string(names[i]));
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(3, uint64(ProtobufLib.WireType.Varint)));
+            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_uint64(sizes[i]));
+            node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
+            node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_bytes(embedded));
+        }
+        bytes memory data_msg = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.Varint));
+        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(DataType.Directory)));
+
+
+        node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited)));
+        node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_bytes(data_msg));      
+        
+        return sha256(node_msg);
+    }
+
+    
+
+    /// @notice file_content_in_folder, does a sha256 multihash of a single chunk file and combines
+    /// it with other hashes in the folder
+    
+    /// @param hashes_ Hashes of the other files, minus the multihash prefix
+    /// @param names_ File names of the files
+    /// @param sizes_ Sizes of the file
+    /// @param insertAt insertAt position at which the content hash should be inserted (0=prepend, length+1 is append)
+    /// @param file_content Content bytes
+    /// @param filename Filename inside the folder
+    /// @return Folder hash
+
     function file_content_in_folder(
         bytes32[] memory hashes_, string[] memory names_, uint64[] memory sizes_,
         uint insertAt, bytes memory file_content, string memory filename
@@ -36,57 +110,7 @@ library IpfsFunctions {
         
         return calculate_folder_hash(hashes, names, sizes);
     }
-    
-    function calculate_ipfs_sha256_32_single_chunk(bytes memory file_content) public pure returns (bytes32, uint) {
-        require(file_content.length <= 65536, "Max content size is 65536 bytes");
-        bytes memory data_msg = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.Varint));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(DataType.File)));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_bytes(file_content));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_key(3, uint64(ProtobufLib.WireType.Varint)));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(file_content.length)));       
 
-        bytes memory PBNode = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited));
-        PBNode = abi.encodePacked(PBNode,  ProtobufLib.encode_bytes(data_msg));
-        return (sha256(PBNode), PBNode.length);
-    }
-
-    function pack_hash(bytes32 h) public pure returns (bytes memory) {
-        return abi.encodePacked(sha256_32b, h);
-    }
-
-    function calculate_folder_hash(bytes32[] memory hashes, string[] memory names, uint64[] memory sizes) public pure returns (bytes32) {
-        require(hashes.length  == names.length && hashes.length == sizes.length, "All arrays must be of the same size");
-        
-        bytes memory node_msg;
-      
-      
-        for (uint i=0; i<hashes.length; i++) {
-            
-            bytes memory embedded;
-            
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited)));
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_bytes(abi.encodePacked(sha256_32b, hashes[i])));
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_string(names[i]));
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_key(3, uint64(ProtobufLib.WireType.Varint)));
-            embedded = abi.encodePacked(embedded,  ProtobufLib.encode_uint64(sizes[i]));
-
-            node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_key(2, uint64(ProtobufLib.WireType.LengthDelimited)));
-            node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_bytes(embedded));
-           
-         
-        }
-        bytes memory data_msg = ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.Varint));
-        data_msg = abi.encodePacked(data_msg,  ProtobufLib.encode_varint(uint64(DataType.Directory)));
-
-
-        node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_key(1, uint64(ProtobufLib.WireType.LengthDelimited)));
-        node_msg = abi.encodePacked(node_msg,  ProtobufLib.encode_bytes(data_msg));
-      
-        
-        return sha256(node_msg);
-    }
 }
 
 /*
